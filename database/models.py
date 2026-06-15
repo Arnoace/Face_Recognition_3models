@@ -1,0 +1,28 @@
+"""SQLite database schema for the attendance system."""
+
+EMPLOYEES_TABLE = """
+CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    employee_id TEXT UNIQUE NOT NULL,
+    department TEXT DEFAULT '',
+    face_feature BLOB,
+    photo BLOB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+MIGRATE_PHOTO = """
+ALTER TABLE employees ADD COLUMN photo BLOB;
+"""
+
+ATTENDANCE_TABLE = """
+CREATE TABLE IF NOT EXISTS attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    check_in TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT '正常'
+);
+"""
+
+SCHEMA = [EMPLOYEES_TABLE, MIGRATE_PHOTO, ATTENDANCE_TABLE]

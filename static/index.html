@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang=zh-CN>
+<head>
+<meta charset=UTF-8>
+<meta name=viewport content="width=device-width,initial-scale=1">
+<title>FaceR — 考勤系统</title>
+<link rel=stylesheet href=/css/style.css>
+</head>
+<body>
+
+<nav class=navbar>
+  <div class=navbar-brand>FaceR <span class=accent>|</span> <span class=badge>考勤系统</span></div>
+    <div class=nav-tabs>
+      <button class="nav-tab active" data-tab=entry>录入</button>
+      <button class=nav-tab data-tab=info>信息管理</button>
+      <button class=nav-tab data-tab=management>员工管理</button>
+      <button class=nav-tab data-tab=attendance>考勤</button>
+      <button class=nav-tab data-tab=records>考勤记录</button>
+    </div>
+    <div class=nav-right>
+      <div class=model-switcher>
+        <select id=model-select onchange="handleModelSwitch(this.value)">
+          <option value="">加载中...</option>
+        </select>
+      </div>
+    </div>
+  </nav>
+
+<main class=main>
+<div id=toast class=toast></div>
+
+<!-- =========== 录入 =========== -->
+<div id=page-entry class="page active">
+  <h1 class=page-title>员工录入</h1>
+  <p class=page-subtitle>新员工注册 — 拍摄人脸照片并填写信息</p>
+  <div class=camera-layout>
+    <div>
+      <div class="card glass">
+        <div class=card-title>摄像头画面</div>
+        <div class=camera-wrapper><video id=entry-video autoplay playsinline></video></div>
+        <div class=camera-preview>
+          <img id=entry-preview style="display:none;width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid rgba(59,130,246,.2)">
+          <span id=entry-nophoto style=color:#475569;font-size:13px>尚未拍照</span>
+        </div>
+        <div class=camera-controls>
+          <button class="btn btn-primary" onclick="capture('entry-video','entry-preview','entry-nophoto','entry')">拍照</button>
+          <button class="btn btn-outline" onclick="clearPhoto('entry')" style=display:none id=btn-clr-entry>清除</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card glass">
+        <div class=card-title>员工信息</div>
+        <form onsubmit="submitEntry(event)">
+          <div class=form-group><label>姓名 *</label><input id=inp-name type=text placeholder="请输入姓名"></div>
+          <div class=form-group><label>工号 *</label><input id=inp-eid type=text placeholder="请输入工号"></div>
+          <div class=form-group><label>部门</label><input id=inp-dept type=text placeholder="请输入部门"></div>
+          <button id=btn-sub-entry type=submit class="btn btn-primary">录入</button>
+        </form>
+      </div>
+      <div id=entry-ok style=display:none class="card glass" style="border-color:rgba(22,163,74,.3)">
+        <p style=color:#4ADE80;font-weight:600>录入成功!</p>
+        <button class="btn btn-outline btn-sm" style=margin-top:8px onclick="resetEntry()">继续录入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========== 信息管理 =========== -->
+<div id=page-info class=page>
+  <h1 class=page-title>员工信息管理</h1>
+  <p class=page-subtitle>查看和编辑员工基本信息</p>
+  <div class="card glass">
+    <div class=search-bar>
+      <input id=search-info type=text placeholder="搜索姓名、工号或部门..." oninput=renderInfo()>
+      <button class="btn btn-outline" onclick=loadInfo()>刷新</button>
+    </div>
+    <div class=table-wrapper>
+      <table id=tbl-info style=display:none><thead><tr><th>编号</th><th>姓名</th><th>工号</th><th>部门</th><th>录入时间</th><th>操作</th></tr></thead><tbody id=tbody-info></tbody></table>
+      <div id=empty-info class=empty-state><p>暂无员工</p></div>
+    </div>
+  </div>
+  <div id=edit-panel class="card glass edit-panel" style=margin-top:16px>
+    <div class=card-title style=color:#60A5FA>编辑员工信息</div>
+    <form onsubmit="saveEdit(event)">
+      <input id=edit-id type=hidden>
+      <div class=form-group><label>姓名</label><input id=edit-name type=text required></div>
+      <div class=form-group><label>工号</label><input id=edit-eid type=text required></div>
+      <div class=form-group><label>部门</label><input id=edit-dept type=text></div>
+      <div style=display:flex;gap:8px>
+        <button type=submit class="btn btn-primary">保存</button>
+        <button type=button class="btn btn-outline" onclick="closeEdit()">取消</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- =========== 员工管理 =========== -->
+<div id=page-management class=page>
+  <h1 class=page-title>员工管理</h1>
+  <p class=page-subtitle>管理面板 — 查看和删除员工</p>
+  <div class=stats-grid id=stats-grid>
+    <div class=stat-card><div class=value id=stat-total>0</div><div class=label>员工总数</div></div>
+    <div class=stat-card><div class=value id=stat-features>0</div><div class=label>已录入人脸</div></div>
+    <div class=stat-card><div class=value id=stat-att>0</div><div class=label>签到次数</div></div>
+    <div class=stat-card><div class=value id=stat-yale>0</div><div class=label>Yale B 身份</div></div>
+  </div>
+  <div class="card glass">
+    <div class=search-bar>
+      <input id=search-mgmt type=text placeholder="搜索姓名、工号或部门..." oninput=renderMgmt()>
+      <button class="btn btn-outline" onclick=loadMgmt()>刷新</button>
+    </div>
+    <div class=table-wrapper>
+      <table id=tbl-mgmt style=display:none><thead><tr><th>编号</th><th>姓名</th><th>工号</th><th>部门</th><th>录入时间</th><th>操作</th></tr></thead><tbody id=tbody-mgmt></tbody></table>
+      <div id=empty-mgmt class=empty-state><p>暂无员工</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- =========== 考勤 =========== -->
+<div id=page-attendance class=page>
+  <h1 class=page-title>员工考勤</h1>
+  <p class=page-subtitle>人脸识别签到 — 工作时间 9:00-17:00</p>
+  <div class=att-layout>
+    <div>
+      <div class="card glass">
+        <div class=card-title>人脸识别</div>
+        <video id=att-video autoplay playsinline style="width:100%;border-radius:10px;background:#000;border:1px solid rgba(59,130,246,.1);aspect-ratio:4/3;object-fit:cover"></video>
+        <div class=camera-controls style=margin-top:12px>
+          <button class="btn btn-primary" onclick="capture('att-video','att-preview','att-nophoto','att')">拍照</button>
+          <button class="btn btn-success" id=btn-recog onclick=recognize() disabled>识别 & 签到</button>
+        </div>
+        <div id=att-result class=recognition-result></div>
+        <img id=att-preview style="display:none;width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid rgba(59,130,246,.2);margin-top:8px">
+        <span id=att-nophoto style=color:#475569;font-size:13px>尚未拍照</span>
+      </div>
+    </div>
+    <div>
+      <div class="card glass">
+        <div class=card-title>今日签到</div>
+        <div class=table-wrapper style=max-height:500px;overflow-y:auto>
+          <table id=tbl-att style=display:none><thead><tr><th>姓名</th><th>签到时间</th><th>状态</th></tr></thead><tbody id=tbody-att></tbody></table>
+          <div id=empty-att class=empty-state><p>今日暂无签到</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========== 考勤记录 =========== -->
+<div id=page-records class=page>
+  <h1 class=page-title>考勤记录管理</h1>
+  <p class=page-subtitle>查询所有考勤记录</p>
+  <div class="card glass">
+    <div class=date-filter>
+      <label>开始日期</label><input id=filter-start type=date>
+      <label>结束日期</label><input id=filter-end type=date>
+      <button class="btn btn-primary" onclick=loadRecords()>查询</button>
+      <button class="btn btn-outline" onclick="clearFilter()">清除</button>
+      <span id=record-count style=font-size:13px;color:#64748B;margin-left:8px></span>
+    </div>
+    <div class=table-wrapper style=max-height:600px;overflow-y:auto>
+      <table id=tbl-records style=display:none><thead><tr><th>编号</th><th>姓名</th><th>工号</th><th>签到时间</th><th>状态</th></tr></thead><tbody id=tbody-records></tbody></table>
+      <div id=empty-records class=empty-state><p>暂无记录</p></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- =========== 员工详情弹窗 =========== -->
+<div id=detail-panel class=detail-overlay style=display:none onclick="if(event.target===this)closeDetail()">
+  <div class=detail-content onclick="event.stopPropagation()">
+    <button class="btn btn-sm detail-close" onclick="closeDetail()">✕</button>
+    <div class=detail-photo>
+      <img id=detail-photo-img src="" alt="员工照片">
+    </div>
+    <div class=detail-info>
+      <h2 id=detail-name></h2>
+      <div class=detail-field><label>工号</label><span id=detail-eid></span></div>
+      <div class=detail-field><label>部门</label><span id=detail-dept></span></div>
+      <div class=detail-field><label>录入时间</label><span id=detail-created class=timestamp></span></div>
+      <div class=detail-section-title>模型特征状态</div>
+      <div id=detail-features class=detail-features></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = { cameraStream: null, captured: {entry:null,att:null}, employees: [] };
+
+document.querySelectorAll('.nav-tab').forEach(b => {
+  b.addEventListener('click', function() {
+    stopCamera();
+    document.querySelectorAll('.nav-tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+    this.classList.add('active');
+    document.getElementById('page-' + this.dataset.tab)?.classList.add('active');
+    if (this.dataset.tab === 'entry') setTimeout(() => startCam('entry-video'), 100);
+    else if (this.dataset.tab === 'attendance') { setTimeout(() => startCam('att-video'), 100); loadTodayAtt(); }
+    else if (this.dataset.tab === 'management') loadMgmt();
+    else if (this.dataset.tab === 'info') loadInfo();
+    else if (this.dataset.tab === 'records') loadRecords();
+  });
+});
+
+function startCam(vid) {
+  stopCamera();
+  if (!navigator.mediaDevices?.getUserMedia) return showToast('浏览器不支持摄像头','error');
+  navigator.mediaDevices.getUserMedia({video:{width:640,height:480,facingMode:'user'}})
+    .then(s => { S.cameraStream = s; const v = document.getElementById(vid); if (v) { v.srcObject = s; v.play().catch(()=>{}); } })
+    .catch(e => showToast('摄像头错误: '+e.message,'error'));
+}
+function stopCamera() { if (S.cameraStream) { S.cameraStream.getTracks().forEach(t=>t.stop()); S.cameraStream = null; } }
+function capture(vid, imgId, noId, key) {
+  const v = document.getElementById(vid); if (!v?.videoWidth) return showToast('摄像头未就绪','error');
+  const c = document.createElement('canvas'); c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0); const url=c.toDataURL('image/jpeg',.9);
+  S.captured[key]=url; const img=document.getElementById(imgId); const no=document.getElementById(noId);
+  if(img){img.src=url;img.style.display='block'} if(no)no.style.display='none';
+  if(key==='entry') document.getElementById('btn-clr-entry').style.display='inline-block';
+  if(key==='att') document.getElementById('btn-recog').disabled=false;
+}
+function clearPhoto(key){S.captured[key]=null;if(key==='entry'){document.getElementById('entry-preview').style.display='none';document.getElementById('entry-nophoto').style.display='inline';document.getElementById('btn-clr-entry').style.display='none'}}
+function showToast(msg,t='success'){const x=document.getElementById('toast');x.textContent=msg;x.className='toast '+t+' show';setTimeout(()=>x.classList.remove('show'),3000)}
+function submitEntry(e){
+  e.preventDefault(); const n=document.getElementById('inp-name').value.trim(), eid=document.getElementById('inp-eid').value.trim(), d=document.getElementById('inp-dept').value.trim();
+  if(!n||!eid)return showToast('请填写姓名和工号','error');
+  if(!S.captured.entry)return showToast('请先拍照','error');
+  const btn=document.getElementById('btn-sub-entry'); btn.disabled=true; btn.innerHTML='<span class=spinner></span> 录入中...';
+  const fd=new FormData(); fd.append('file',dataURLtoBlob(S.captured.entry),'face.jpg');
+  fd.append('name',n);fd.append('employee_id',eid);fd.append('department',d);
+  fetch('/api/employees',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.code===200){showToast('录入成功: '+n,'success');document.getElementById('entry-ok').style.display='block';document.querySelector('#page-entry form').style.display='none'}else showToast(d.detail||'录入失败','error')}).catch(e=>showToast('请求失败: '+e.message,'error')).finally(()=>{btn.disabled=false;btn.textContent='录入'})
+}
+function resetEntry(){document.getElementById('entry-ok').style.display='none';document.querySelector('#page-entry form').style.display='block';document.getElementById('inp-name').value='';document.getElementById('inp-eid').value='';document.getElementById('inp-dept').value='';clearPhoto('entry')}
+function loadMgmt(){fetch('/api/employees').then(r=>r.json()).then(d=>{if(d.code!==200)return;S.employees=d.data||[];if(d.stats){document.getElementById('stat-total').textContent=d.stats.total||0;document.getElementById('stat-features').textContent=d.stats.db_features||0;document.getElementById('stat-att').textContent=d.stats.attendance_count||0;document.getElementById('stat-yale').textContent=d.stats.yale_features||0}renderMgmt()}).catch(e=>console.error(e))}
+function renderMgmt(){const q=document.getElementById('search-mgmt').value.toLowerCase();const f=S.employees.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.employee_id||'').toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));const tb=document.getElementById('tbody-mgmt'),tbl=document.getElementById('tbl-mgmt'),em=document.getElementById('empty-mgmt');tb.innerHTML='';if(!f.length){tbl.style.display='none';em.style.display='block';em.innerHTML='<p>'+(S.employees.length===0?'暂无员工':'无匹配结果')+'</p>';return}tbl.style.display='';em.style.display='none';f.forEach(e=>{tb.innerHTML+='<tr><td>'+e.id+'</td><td><strong>'+esc(e.name)+'</strong></td><td>'+esc(e.employee_id)+'</td><td>'+(e.department||'-')+'</td><td class=timestamp>'+fmt(e.created_at)+'</td><td><button class="btn btn-primary btn-sm" onclick="openDetail('+e.id+')">详情</button><button class="btn btn-danger btn-sm" onclick="delMgmt('+e.id+',\''+esc(e.name)+'\')">删除</button></td>'})}
+function delMgmt(id,n){if(!confirm('确认删除 "'+n+'"?'))return;fetch('/api/employees/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.code===200){showToast('已删除','success');loadMgmt();loadInfo()}}).catch(e=>showToast('操作失败','error'))}
+function loadInfo(){fetch('/api/employees').then(r=>r.json()).then(d=>{if(d.code===200){S.employees=d.data||[];renderInfo()}}).catch(e=>console.error(e))}
+function renderInfo(){const q=document.getElementById('search-info').value.toLowerCase();const f=S.employees.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.employee_id||'').toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));const tb=document.getElementById('tbody-info'),tbl=document.getElementById('tbl-info'),em=document.getElementById('empty-info');tb.innerHTML='';if(!f.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';f.forEach(e=>{tb.innerHTML+='<tr><td>'+e.id+'</td><td><strong>'+esc(e.name)+'</strong></td><td>'+esc(e.employee_id)+'</td><td>'+(e.department||'-')+'</td><td class=timestamp>'+fmt(e.created_at)+'</td><td><button class="btn btn-primary btn-sm" onclick="openDetail('+e.id+')">详情</button><button class="btn btn-primary btn-sm" onclick="openEdit('+e.id+')">编辑</button></td>'})}
+function openEdit(id){const e=S.employees.find(x=>x.id===id);if(!e)return;document.getElementById('edit-id').value=e.id;document.getElementById('edit-name').value=e.name;document.getElementById('edit-eid').value=e.employee_id;document.getElementById('edit-dept').value=e.department||'';document.getElementById('edit-panel').classList.add('show');document.getElementById('edit-panel').scrollIntoView({behavior:'smooth'})}
+function closeEdit(){document.getElementById('edit-panel').classList.remove('show')}
+function saveEdit(e){e.preventDefault();const id=document.getElementById('edit-id').value;const fd=new FormData();fd.append('name',document.getElementById('edit-name').value.trim());fd.append('employee_id',document.getElementById('edit-eid').value.trim());fd.append('department',document.getElementById('edit-dept').value.trim());fetch('/api/employees/'+id,{method:'PUT',body:fd}).then(r=>r.json()).then(d=>{if(d.code===200){showToast('更新成功','success');closeEdit();loadInfo();loadMgmt()}else showToast(d.detail||'更新失败','error')}).catch(e=>showToast('请求失败','error'))}
+function recognize(){
+  if(!S.captured.att)return showToast('请先拍照','error');
+  const btn=document.getElementById('btn-recog');btn.disabled=true;btn.innerHTML='<span class=spinner></span> 识别中...';
+  const fd=new FormData();fd.append('file',dataURLtoBlob(S.captured.att),'face.jpg');
+  document.getElementById('att-result').className='recognition-result';document.getElementById('att-result').innerHTML='';
+  fetch('/api/recognize',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+    const r=document.getElementById('att-result');
+    if(d.code===200&&d.data?.found){
+      const emp=d.data.employee;
+      r.className='recognition-result show success';
+      r.innerHTML='<div class=name>'+esc(emp.name)+'</div><div class=detail>'+(emp.department||'-')+' | '+emp.employee_id+'</div><div class=detail>相似度: '+(d.data.similarity*100).toFixed(1)+'%</div>';
+      showToast('识别成功: '+emp.name,'success');
+      fetch('/api/attendance/checkin?employee_id='+emp.employee_id+'&name='+encodeURIComponent(emp.name),{method:'POST'}).then(r=>r.json()).then(cd=>{
+        if(cd.data?.duplicate)showToast('今日已签到','info');
+        else showToast('签到成功 ('+(cd.data?.status||'正常')+')','success');
+        loadTodayAtt();loadRecords();
+      }).catch(()=>{});
+    }else{
+      const msg=d.data?.message||'未匹配到人脸';
+      r.className='recognition-result show fail';
+      r.innerHTML='<div class=name>未识别</div><div class=detail>'+msg+'</div>'+(d.data?.similarity!==undefined?'<div class=detail>最佳匹配: '+(d.data.similarity*100).toFixed(1)+'%</div>':'');
+      showToast('未识别: '+msg,'error');
+    }
+  }).catch(e=>showToast('请求失败: '+e.message,'error')).finally(()=>{btn.disabled=false;btn.textContent='识别 & 签到'})
+}
+function loadTodayAtt(){fetch('/api/attendance').then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];const tb=document.getElementById('tbody-att'),tbl=document.getElementById('tbl-att'),em=document.getElementById('empty-att');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td><strong>'+esc(r.name)+'</strong></td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td>'})}).catch(e=>console.error(e))}
+function loadRecords(){const s=document.getElementById('filter-start').value;const e=document.getElementById('filter-end').value;let u='/api/attendance/all?limit=1000';if(s)u+='&start='+s;if(e)u+='&end='+e;fetch(u).then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];document.getElementById('record-count').textContent='共 '+records.length+' 条记录';const tb=document.getElementById('tbody-records'),tbl=document.getElementById('tbl-records'),em=document.getElementById('empty-records');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td>'+r.id+'</td><td><strong>'+esc(r.name)+'</strong></td><td>'+esc(r.employee_id)+'</td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td>'})}).catch(e=>console.error(e))}
+function clearFilter(){document.getElementById('filter-start').value='';document.getElementById('filter-end').value='';loadRecords()}
+// =========== Employee Detail ===========
+function openDetail(pk){
+  const overlay=document.getElementById('detail-panel');
+  overlay.style.display='flex';
+  overlay.innerHTML='<div class=detail-content onclick="event.stopPropagation()"><div style="text-align:center;padding:40px"><div class=spinner></div><p style="color:#64748B;margin-top:12px">加载中...</p></div></div>';
+  fetch('/api/employees/'+pk).then(r=>r.json()).then(d=>{
+    if(d.code!==200){overlay.style.display='none';return}
+    const e=d.data;
+    const avai=e.available_models||[];
+    const mlabels={'ArcFace':'ArcFace模型','ModelA':'Fisherfaces','ModelB':'FaceNet'};
+    let featHtml='';
+    ['ArcFace','ModelA','ModelB'].forEach(function(mn){
+      const info=e.features&&e.features[mn];
+      if(info){var fs='['+info.preview.join(', ')+']';featHtml+='<div class=detail-feature-item><span class=\"icon ok\">✓</span><div style=flex:1><div class=name>'+info.label+'</div><div style=font-size:11px;color:#64748B;margin-top:2px>'+info.dim_label+' | 范数:'+info.norm+'</div><pre class=feature-preview>'+fs+'</pre></div></div>'}
+      else{featHtml+='<div class=detail-feature-item><span class=\"icon none\">—</span><div><div class=name>'+(mlabels[mn]||mn)+'</div><div style=font-size:11px;color:#475569>无特征</div></div></div>'}
+    });
+    overlay.innerHTML='<div class=detail-content onclick="event.stopPropagation()">'+
+      '<button class="btn btn-sm detail-close" onclick="closeDetail()">✕</button>'+
+      '<div class=detail-photo>'+(e.photo_base64?'<img src="data:'+e.photo_mime+';base64,'+e.photo_base64+'" alt="照片">':'<div class=no-photo-placeholder>无照片</div>')+'</div>'+
+      '<div class=detail-info>'+
+      '<h2>'+esc(e.name)+'</h2>'+
+      '<div class=detail-field><label>工号</label><span>'+esc(e.employee_id)+'</span></div>'+
+      '<div class=detail-field><label>部门</label><span>'+esc(e.department||'-')+'</span></div>'+
+      '<div class=detail-field><label>录入时间</label><span class=timestamp>'+fmt(e.created_at)+'</span></div>'+
+      '<div class=detail-section-title>模型特征状态</div>'+
+      '<div class=detail-features>'+featHtml+'</div></div></div>';
+  }).catch(function(){overlay.style.display='none'});
+}
+function closeDetail(){document.getElementById('detail-panel').style.display='none'}
+function dataURLtoBlob(u){const p=u.split(','),m=p[0].match(/:(.*?);/)[1],b=atob(p[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new Blob([a],{type:m})}
+function fmt(ts){if(!ts)return'';const d=new Date(ts+'Z');return d.toLocaleString('zh-CN',{hour12:false})}
+function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+// =========== Model Switcher ===========
+function loadModelStatus(){
+  fetch('/api/model/status').then(r=>r.json()).then(d=>{
+    if(d.code!==200)return;
+    const sel=document.getElementById('model-select');
+    const cur=d.data.current;
+    const avai=d.data.available||[];
+    sel.innerHTML='';
+    avai.forEach(m=>{
+      const o=document.createElement('option');
+      o.value=m;
+      o.textContent=m==='ArcFace'?'ArcFace模型':m==='ModelA'?'Fisherfaces':m==='ModelB'?'FaceNet':m;
+      if(m===cur)o.selected=true;
+      sel.appendChild(o);
+    });
+  }).catch(e=>console.error('Model status error:',e));
+}
+function handleModelSwitch(name){
+  fetch('/api/model/switch?model_name='+encodeURIComponent(name),{method:'POST'})
+    .then(r=>r.json()).then(d=>{
+      if(d.code===200){
+        showToast('已切换至: '+name,'success');
+        const sel=document.getElementById('model-select');
+        Array.from(sel.options).forEach(o=>{o.selected=o.value===name});
+      }else showToast('切换失败: '+(d.detail||''),'error');
+    }).catch(e=>{showToast('切换失败','error');console.error(e)});
+}
+// Load model status after page init
+setTimeout(loadModelStatus, 300);
+</script>
+</body>
+</html>
+
+

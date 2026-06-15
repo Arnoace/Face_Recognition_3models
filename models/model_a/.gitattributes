@@ -1,0 +1,11 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Python files
+*.py text diff=python
+
+# Binary files
+*.png binary
+*.jpg binary
+*.pkl binary
+*.yml binary

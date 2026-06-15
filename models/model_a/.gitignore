@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+.venv/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude
+.claude/
+
+# Dataset (large, not for Git)
+data/
+
+# Generated results (可重新生成)
+results/
+
+# Temporary test scripts
+quick_test.py
+regenerate_charts.py
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini

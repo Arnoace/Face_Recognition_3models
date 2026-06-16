@@ -146,6 +146,87 @@ tr:hover td{background:rgba(59,130,246,.03)}
 .att-layout{display:grid;grid-template-columns:480px 1fr;gap:24px}
 .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(248,250,252,.15);border-top-color:#3B82F6;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+
+.upload-divider::before,.upload-divider::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,rgba(59,130,246,.1) 50%,transparent)}
+
+
+
+
+/* =========== Entry Mode Tabs =========== */
+.input-mode-tabs{display:flex;gap:4px;margin-bottom:16px;background:rgba(15,23,42,.5);padding:3px;border-radius:10px;border:1px solid rgba(59,130,246,.08)}
+.input-mode-tab{padding:7px 14px;border:none;border-radius:8px;background:transparent;color:#64748B;font-family:"Inter",sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .25s ease;flex:1;text-align:center}
+.input-mode-tab:hover{color:#CBD5E1;background:rgba(248,250,252,.04)}
+.input-mode-tab.active{color:#F8FAFC;background:rgba(59,130,246,.14);box-shadow:0 1px 8px rgba(59,130,246,.1)}
+.entry-mode-panel{display:none}
+.entry-mode-panel.active{display:block;animation:fadeIn .35s ease-out}
+
+/* =========== Upload Zone =========== */
+.upload-camera-wrapper{
+    width:100%;
+    aspect-ratio:4/3;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:16px;
+
+    background:linear-gradient(
+        135deg,
+        rgba(15,23,42,.95),
+        rgba(30,41,59,.95)
+    );
+
+    border:1px solid rgba(59,130,246,.15);
+
+    overflow:hidden;
+}
+.upload-placeholder{
+    text-align:center;
+    padding:32px;
+}
+.upload-illustration{
+    font-size:72px;
+    margin-bottom:16px;
+}
+.upload-placeholder h3{
+    color:#F8FAFC;
+    font-size:18px;
+    font-weight:600;
+    margin-bottom:8px;
+}
+.upload-placeholder p{
+    color:#94A3B8;
+    font-size:13px;
+    margin-bottom:20px;
+}
+.upload-btn{
+    padding:12px 28px;
+
+    border:none;
+    border-radius:12px;
+
+    background:linear-gradient(
+        135deg,
+        #3B82F6,
+        #2563EB
+    );
+
+    color:#fff;
+    font-weight:600;
+
+    cursor:pointer;
+
+    transition:.25s;
+}
+.upload-btn:hover{
+    transform:translateY(-2px);
+
+    box-shadow:
+        0 8px 24px rgba(59,130,246,.35);
+}
+
 @media(max-width:900px){
   .navbar{gap:12px;padding:10px 16px;top:10px;flex-wrap:wrap;justify-content:center}
   .nav-tab{padding:6px 10px;font-size:11px}

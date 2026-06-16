@@ -32,19 +32,60 @@
 <!-- =========== 录入 =========== -->
 <div id=page-entry class="page active">
   <h1 class=page-title>员工录入</h1>
-  <p class=page-subtitle>新员工注册 — 拍摄人脸照片并填写信息</p>
+  <p class=page-subtitle>新员工注册 — 拍摄或上传人脸照片并填写信息</p>
   <div class=camera-layout>
     <div>
       <div class="card glass">
-        <div class=card-title>摄像头画面</div>
-        <div class=camera-wrapper><video id=entry-video autoplay playsinline></video></div>
+        <div class=card-title>人脸照片</div>
+        <div class="input-mode-tabs">
+          <button class="input-mode-tab active" data-mode="live" onclick="switchEntryMode('live')">当场录入</button>
+          <button class="input-mode-tab" data-mode="upload" onclick="switchEntryMode('upload')">拍照上传</button>
+        </div>
+        <div id=entry-panel-live class="entry-mode-panel active">
+          <div class=camera-wrapper><video id=entry-video autoplay playsinline></video></div>
+          <div class=camera-controls>
+            <button class="btn btn-primary" onclick="capture('entry-video','entry-preview','entry-nophoto','entry')">拍照</button>
+            <button class="btn btn-outline" onclick="clearPhoto('entry')" style=display:none id=btn-clr-entry>清除</button>
+          </div>
+        </div>
+<div id=entry-panel-upload class="entry-mode-panel">
+  <div class="upload-camera-wrapper">
+
+    <div class="upload-placeholder">
+
+      <div class="upload-illustration">
+        🖼️
+      </div>
+
+      <h3>上传员工证件照</h3>
+
+      <p>
+        请上传正面免冠照片
+      </p>
+
+      <button
+        type="button"
+        class="upload-btn"
+        onclick="document.getElementById('file-input').click()"
+      >
+        选择照片
+      </button>
+
+      <input
+        id="file-input"
+        type="file"
+        accept="image/jpeg,image/png"
+        hidden
+        onchange="handleFileUpload(event)"
+      >
+
+    </div>
+
+  </div>
+</div>
         <div class=camera-preview>
           <img id=entry-preview style="display:none;width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid rgba(59,130,246,.2)">
           <span id=entry-nophoto style=color:#475569;font-size:13px>尚未拍照</span>
-        </div>
-        <div class=camera-controls>
-          <button class="btn btn-primary" onclick="capture('entry-video','entry-preview','entry-nophoto','entry')">拍照</button>
-          <button class="btn btn-outline" onclick="clearPhoto('entry')" style=display:none id=btn-clr-entry>清除</button>
         </div>
       </div>
     </div>
@@ -223,16 +264,58 @@ function capture(vid, imgId, noId, key) {
 }
 function clearPhoto(key){S.captured[key]=null;if(key==='entry'){document.getElementById('entry-preview').style.display='none';document.getElementById('entry-nophoto').style.display='inline';document.getElementById('btn-clr-entry').style.display='none'}}
 function showToast(msg,t='success'){const x=document.getElementById('toast');x.textContent=msg;x.className='toast '+t+' show';setTimeout(()=>x.classList.remove('show'),3000)}
+
+let S_uploadFile=null;
+
+function switchEntryMode(mode) {
+  document.querySelectorAll('.input-mode-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('.entry-mode-panel').forEach(p => p.classList.toggle('active', p.id === 'entry-panel-' + mode));
+  if (mode === 'live') {
+    clearUpload();
+    setTimeout(() => startCam('entry-video'), 100);
+  } else {
+    stopCamera();
+  }
+}
+
+function handleFileUpload(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  S_uploadFile = f;
+  const r = new FileReader();
+  r.onload = function(ev) {
+    const u = ev.target.result;
+    S.captured.entry = u;
+    document.getElementById('entry-preview').src = u;
+    document.getElementById('entry-preview').style.display = 'block';
+    document.getElementById('entry-nophoto').style.display = 'none';
+    document.getElementById('btn-clr-entry').style.display = 'inline-block';
+  };
+  r.readAsDataURL(f);
+  e.target.value = '';
+}
+
+function clearUpload() {
+  S_uploadFile = null;
+  S.captured.entry = null;
+  document.getElementById('btn-clr-entry').style.display = 'none';
+  clearPhoto('entry');
+}
 function submitEntry(e){
   e.preventDefault(); const n=document.getElementById('inp-name').value.trim(), eid=document.getElementById('inp-eid').value.trim(), d=document.getElementById('inp-dept').value.trim();
   if(!n||!eid)return showToast('请填写姓名和工号','error');
   if(!S.captured.entry)return showToast('请先拍照','error');
   const btn=document.getElementById('btn-sub-entry'); btn.disabled=true; btn.innerHTML='<span class=spinner></span> 录入中...';
-  const fd=new FormData(); fd.append('file',dataURLtoBlob(S.captured.entry),'face.jpg');
+  const fd=new FormData();
+  if (S_uploadFile) {
+    fd.append('file', S_uploadFile);
+  } else {
+    fd.append('file', dataURLtoBlob(S.captured.entry), 'face.jpg');
+  }
   fd.append('name',n);fd.append('employee_id',eid);fd.append('department',d);
   fetch('/api/employees',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.code===200){showToast('录入成功: '+n,'success');document.getElementById('entry-ok').style.display='block';document.querySelector('#page-entry form').style.display='none'}else showToast(d.detail||'录入失败','error')}).catch(e=>showToast('请求失败: '+e.message,'error')).finally(()=>{btn.disabled=false;btn.textContent='录入'})
 }
-function resetEntry(){document.getElementById('entry-ok').style.display='none';document.querySelector('#page-entry form').style.display='block';document.getElementById('inp-name').value='';document.getElementById('inp-eid').value='';document.getElementById('inp-dept').value='';clearPhoto('entry')}
+function resetEntry(){document.getElementById('entry-ok').style.display='none';document.querySelector('#page-entry form').style.display='block';document.getElementById('inp-name').value='';document.getElementById('inp-eid').value='';document.getElementById('inp-dept').value='';clearPhoto('entry');S_uploadFile=null;switchEntryMode('live')}
 function loadMgmt(){fetch('/api/employees').then(r=>r.json()).then(d=>{if(d.code!==200)return;S.employees=d.data||[];if(d.stats){document.getElementById('stat-total').textContent=d.stats.total||0;document.getElementById('stat-features').textContent=d.stats.db_features||0;document.getElementById('stat-att').textContent=d.stats.attendance_count||0;document.getElementById('stat-yale').textContent=d.stats.yale_features||0}renderMgmt()}).catch(e=>console.error(e))}
 function renderMgmt(){const q=document.getElementById('search-mgmt').value.toLowerCase();const f=S.employees.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.employee_id||'').toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));const tb=document.getElementById('tbody-mgmt'),tbl=document.getElementById('tbl-mgmt'),em=document.getElementById('empty-mgmt');tb.innerHTML='';if(!f.length){tbl.style.display='none';em.style.display='block';em.innerHTML='<p>'+(S.employees.length===0?'暂无员工':'无匹配结果')+'</p>';return}tbl.style.display='';em.style.display='none';f.forEach(e=>{tb.innerHTML+='<tr><td>'+e.id+'</td><td><strong>'+esc(e.name)+'</strong></td><td>'+esc(e.employee_id)+'</td><td>'+(e.department||'-')+'</td><td class=timestamp>'+fmt(e.created_at)+'</td><td><button class="btn btn-primary btn-sm" onclick="openDetail('+e.id+')">详情</button><button class="btn btn-danger btn-sm" onclick="delMgmt('+e.id+',\''+esc(e.name)+'\')">删除</button></td>'})}
 function delMgmt(id,n){if(!confirm('确认删除 "'+n+'"?'))return;fetch('/api/employees/'+id,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.code===200){showToast('已删除','success');loadMgmt();loadInfo()}}).catch(e=>showToast('操作失败','error'))}

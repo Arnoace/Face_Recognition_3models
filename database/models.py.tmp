@@ -1,0 +1,48 @@
+"""SQLite database schema for the attendance system."""
+
+EMPLOYEES_TABLE = """
+CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    employee_id TEXT UNIQUE NOT NULL,
+    department TEXT DEFAULT '',
+    face_feature BLOB,
+    photo BLOB,
+    id_card_photo BLOB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+MIGRATE_PHOTO = """
+ALTER TABLE employees ADD COLUMN photo BLOB;
+"""
+MIGRATE_ID_CARD = """
+ALTER TABLE employees ADD COLUMN id_card_photo BLOB;
+"""
+
+LEAVES_TABLE = """
+CREATE TABLE IF NOT EXISTS leaves (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT NOT NULL,
+    employee_name TEXT DEFAULT '',
+    leave_date TEXT NOT NULL,
+    leave_type TEXT DEFAULT '全天',
+    reason TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+"""
+
+ATTENDANCE_TABLE = """
+CREATE TABLE IF NOT EXISTS attendance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    check_in TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT '正常',
+    check_type TEXT DEFAULT '签到'
+);
+"""
+MIGRATE_CHECK_TYPE = """
+ALTER TABLE attendance ADD COLUMN check_type TEXT DEFAULT '签到';
+"""
+
+SCHEMA = [EMPLOYEES_TABLE, MIGRATE_PHOTO, MIGRATE_ID_CARD, ATTENDANCE_TABLE, MIGRATE_CHECK_TYPE, LEAVES_TABLE]

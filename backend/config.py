@@ -13,7 +13,32 @@ ARC_LABELS_PATH = os.path.join(FEATURES_DIR, 'arcface_labels.npy')
 ARC_NAMES_PATH = os.path.join(FEATURES_DIR, 'arcface_label_names.json')
 
 # Recognition settings
-SIMILARITY_THRESHOLD = 0.45  # Cosine similarity threshold for recognition
+SIMILARITY_THRESHOLD = 0.45  # Cosine similarity threshold for recognition (default)
+
+# 各模型独立的相似度阈值
+# Fisherfaces 使用原始像素特征，任意人脸余弦相似度都在 0.85 以上，
+# 必须设置较高阈值才能区分已注册/未注册人员
+MODEL_SIMILARITY_THRESHOLDS = {
+    "ArcFace":    0.55,   # 512维深度学习嵌入，不同人通常 < 0.35
+    "Fisherfaces":0.55,   # 27维 LDA 判别特征，与 ArcFace 分布接近
+    "FaceNet":    0.55,   # 512维深度学习嵌入
+}
+
+# 各模型独立的竞争裕度：最佳匹配必须比第二匹配高出此值，否则拒识
+# 防止"矮子里拔高个"——无人相似时前两名分数会很接近
+MODEL_SIMILARITY_MARGINS = {
+    "ArcFace":    0.15,   # 最佳和第二名差距 ≥ 0.15
+    "Fisherfaces":0.15,   # 27维判别特征，动态范围足够
+    "FaceNet":    0.15,
+}
+
+def get_similarity_threshold(model_name: str) -> float:
+    """获取指定模型的相似度阈值"""
+    return MODEL_SIMILARITY_THRESHOLDS.get(model_name, SIMILARITY_THRESHOLD)
+
+def get_similarity_margin(model_name: str) -> float:
+    """获取指定模型的竞争裕度（Top-2 margin）"""
+    return MODEL_SIMILARITY_MARGINS.get(model_name, 0.10)
 
 # Server settings
 HOST = '127.0.0.1'

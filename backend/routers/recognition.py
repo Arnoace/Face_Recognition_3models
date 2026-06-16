@@ -18,8 +18,13 @@ class FeatureDatabase:
         """Get or create the feature store for a given model."""
         mn = model_name or (self._model_manager.current_name if self._model_manager else "default")
         if mn not in self._stores:
+            # 根据模型推断特征维度，避免 Fisherfaces (10000维) 与默认 512 冲突
+            dim = 512
+            if self._model_manager and mn in self._model_manager._models:
+                m = self._model_manager._models[mn]
+                dim = m.feature_dim if hasattr(m, 'feature_dim') else 512
             self._stores[mn] = {
-                "features": np.empty((0, 512), dtype=np.float32),
+                "features": np.empty((0, dim), dtype=np.float32),
                 "metadata": [],
                 "yale_metadata": [],
                 "db_metadata": [],
@@ -173,16 +178,43 @@ class FeatureDatabase:
         self.features = np.delete(self.features, idxs[0], axis=0)
         s["db_metadata"] = [m for m in s["db_metadata"] if m['id']!=pk]
 
-    def find_match(self, qf, th=None):
-        if th is None: th = config.SIMILARITY_THRESHOLD
-        if self.features.size == 0: return {'found':False,'similarity':0,'employee':None}
+    def find_match(self, qf, th=None, model_name=None):
+        if th is None:
+            th = config.get_similarity_threshold(model_name) if model_name else config.SIMILARITY_THRESHOLD
+        margin = config.get_similarity_margin(model_name) if model_name else 0.10
+        s = self._store(model_name)
+        if s["features"].size == 0:
+            return {'found':False,'similarity':0,'employee':None,'threshold':round(th,4)}
         qf = qf.astype(np.float32)
         n = np.linalg.norm(qf)
         if n > 0: qf /= n
-        sims = np.dot(self.features, qf)
-        bi = int(np.argmax(sims)); bs = float(sims[bi])
-        emp = self.metadata[bi] if bs >= th else None
-        return {'found':bs>=th,'similarity':round(bs,4),'employee':emp}
+        sims = np.dot(s["features"], qf)
+        n_candidates = len(sims)
+
+        if n_candidates == 1:
+            bs = float(sims[0]); bi = 0; second_bs = 0.0
+        else:
+            # 取 Top-2 相似度：最佳匹配必须明显高于第二名
+            top2_idx = np.argpartition(sims, -2)[-2:]
+            top2_sims = sims[top2_idx]
+            sort_order = np.argsort(top2_sims)[::-1]
+            bi = int(top2_idx[sort_order[0]])
+            bs = float(top2_sims[sort_order[0]])
+            second_bs = float(top2_sims[sort_order[1]])
+
+        # 双重校验：1) 超过阈值  2) 与第二名拉开差距（防止"矮子里拔高个"）
+        passed_threshold = bs >= th
+        passed_margin = (bs - second_bs) >= margin
+        emp = s["metadata"][bi] if (passed_threshold and passed_margin) else None
+
+        return {
+            'found': passed_threshold and passed_margin,
+            'similarity': round(bs, 4),
+            'second_similarity': round(second_bs, 4),
+            'margin': round(bs - second_bs, 4),
+            'threshold': round(th, 4),
+            'employee': emp,
+        }
 def create_recognition_router(model_manager, feature_db):
     router = APIRouter(prefix="/api/recognize", tags=["Recognition"])
     @router.post("")
@@ -195,5 +227,6 @@ def create_recognition_router(model_manager, feature_db):
             feat = model_manager.extract_feature(img)
         except Exception as e:
             return {"code": 400, "data": {"found": False, "message": f"特征提取失败: {str(e)}"}}
-        return {"code": 200, "data": feature_db.find_match(feat)}
+        model_name = model_manager.current_name
+        return {"code": 200, "data": feature_db.find_match(feat, model_name=model_name)}
     return router

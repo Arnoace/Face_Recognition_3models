@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FaceTrain 人脸识别系统</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+/* Header */
+.header { background: linear-gradient(135deg, #1a237e, #283593); color: #fff; padding: 20px 40px; display: flex; align-items: center; gap: 16px; }
+.header h1 { font-size: 22px; font-weight: 600; }
+.header span { font-size: 13px; opacity: .7; }
+
+/* Container */
+.container { max-width: 1000px; margin: 0 auto; padding: 30px 20px; }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 24px; }
+.tab-btn { flex: 1; padding: 14px; border: none; background: #fff; font-size: 15px; font-weight: 500; cursor: pointer; transition: all .2s; color: #666; }
+.tab-btn:hover { background: #f8f9ff; }
+.tab-btn.active { background: #1a237e; color: #fff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Card */
+.card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 20px; }
+.card h2 { font-size: 16px; margin-bottom: 16px; color: #1a237e; }
+
+/* Camera Area */
+.camera-area { display: flex; gap: 20px; flex-wrap: wrap; }
+.camera-box { flex: 1; min-width: 280px; }
+.camera-box video, .camera-box canvas { width: 100%; border-radius: 8px; background: #000; display: block; }
+.camera-box canvas { display: none; }
+.camera-box canvas.show { display: block; }
+.camera-box video.show { display: block; }
+.camera-box video { display: none; }
+
+.camera-controls { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+
+/* Buttons */
+.btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
+.btn-primary { background: #1a237e; color: #fff; }
+.btn-primary:hover { background: #283593; }
+.btn-primary:disabled { background: #9fa8da; cursor: not-allowed; }
+.btn-success { background: #2e7d32; color: #fff; }
+.btn-success:hover { background: #388e3c; }
+.btn-danger { background: #c62828; color: #fff; }
+.btn-danger:hover { background: #d32f2f; }
+.btn-outline { background: #fff; color: #1a237e; border: 2px solid #1a237e; }
+.btn-outline:hover { background: #f5f5ff; }
+.btn-secondary { background: #546e7a; color: #fff; }
+.btn-secondary:hover { background: #607d8b; }
+
+/* Form */
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 13px; font-weight: 500; color: #555; margin-bottom: 4px; }
+.form-group input { width: 100%; padding: 10px 14px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 14px; transition: border .2s; }
+.form-group input:focus { outline: none; border-color: #1a237e; }
+
+/* File Upload */
+
+/* Message */
+.msg { padding: 12px 16px; border-radius: 8px; margin-top: 12px; font-size: 14px; display: none; }
+.msg.show { display: block; }
+.msg.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+.msg.error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+
+/* Results */
+.preview-img { width: 100%; border-radius: 8px; background: #f5f5f5; margin-bottom: 12px; display: none; }
+.preview-img.show { display: block; }
+
+.result-card { border: 2px solid #e8eaf6; border-radius: 10px; padding: 16px; margin-top: 12px; text-align: center; }
+.result-card.identified { border-color: #2e7d32; background: #f1f8e9; }
+.result-card.unidentified { border-color: #ef9a9a; background: #fff5f5; }
+.result-card .status-icon { font-size: 40px; margin-bottom: 8px; }
+.result-card .name { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+.result-card .score { font-size: 14px; color: #666; }
+
+.results-list { margin-top: 12px; }
+.result-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+.result-item:last-child { border-bottom: none; }
+.result-item .rank { width: 24px; height: 24px; border-radius: 50%; background: #e8eaf6; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #1a237e; }
+.result-item .rname { flex: 1; font-weight: 500; }
+.result-item .rsim { font-size: 13px; color: #666; }
+.result-item .rsim.high { color: #2e7d32; font-weight: 600; }
+.result-item .rsim.low { color: #c62828; }
+
+/* Gallery */
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.gallery-item { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; text-align: center; position: relative; }
+.gallery-item img { width: 100%; height: 120px; object-fit: cover; display: block; }
+.gallery-item .gname { padding: 6px; font-size: 12px; }
+.gallery-item .del-btn { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; border: none; background: rgba(198,40,40,.85); color: #fff; font-size: 14px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+.gallery-item:hover .del-btn { display: flex; }
+
+.empty-state { text-align: center; padding: 40px 20px; color: #999; }
+.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+
+/* Upload area */
+/* Video placeholder */
+.video-placeholder { width: 100%; aspect-ratio: 4/3; border-radius: 8px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; color: #bbb; font-size: 14px; }
+
+/* Responsive */
+@media (max-width: 640px) {
+    .header { padding: 14px 16px; flex-wrap: wrap; }
+    .container { padding: 16px; }
+    .camera-area { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🔐 FaceTrain</h1>
+    <span>人脸识别测试系统</span>
+</div>
+
+<div class="container">
+
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('register')">📝 人脸录入</button>
+        <button class="tab-btn" onclick="switchTab('recognize')">🔍 人脸识别</button>
+    </div>
+
+    <!-- ============ Tab: 录入 ============ -->
+    <div id="tab-register" class="tab-content active">
+        <div class="card">
+            <h2>📷 拍摄 / 上传照片</h2>
+            <div class="camera-area">
+                <div class="camera-box">
+                    <div id="reg-placeholder" class="video-placeholder">请选择图片或开启摄像头</div>
+                    <video id="reg-video" autoplay playsinline></video>
+                    <canvas id="reg-canvas"></canvas>
+                    <div class="camera-controls">
+                        <button class="btn btn-outline" onclick="toggleCamera('reg')">📷 开启摄像头</button>
+                        <button class="btn btn-secondary" onclick="capturePhoto('reg')" disabled id="reg-capture-btn">📸 拍照</button>
+                        <input type="file" accept="image/*" id="reg-file-input" style="display:none" onchange="handleFileUpload(event,'reg')">
+                        <button class="btn btn-outline" onclick="document.getElementById('reg-file-input').click()">🖼️ 选择图片</button>
+                        <button class="btn btn-secondary" onclick="resetCamera('reg')">🔄 重置</button>
+                    </div>
+                </div>
+                <div class="camera-box">
+                    <div style="display:flex;flex-direction:column;height:100%;justify-content:center;">
+                        <div class="form-group">
+                            <label>姓名</label>
+                            <input type="text" id="reg-name" placeholder="输入姓名" onkeydown="if(event.key==='Enter')doRegister()">
+                        </div>
+                        <button class="btn btn-success" onclick="doRegister()" id="reg-submit-btn" disabled>✅ 录入人脸</button>
+                        <div id="reg-msg" class="msg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📋 已录入人员 (<span id="gallery-count">0</span>)</h2>
+            <div id="gallery-list">
+                <div class="empty-state">
+                    <div class="icon">📭</div>
+                    <div>暂无录入，请先注册人脸</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Tab: 识别 ============ -->
+    <div id="tab-recognize" class="tab-content">
+        <div class="card">
+            <h2>📷 拍摄 / 上传照片</h2>
+            <div class="camera-area">
+                <div class="camera-box">
+                    <div id="rec-placeholder" class="video-placeholder">请选择图片或开启摄像头</div>
+                    <video id="rec-video" autoplay playsinline></video>
+                    <canvas id="rec-canvas"></canvas>
+                    <div class="camera-controls">
+                        <button class="btn btn-outline" onclick="toggleCamera('rec')">📷 开启摄像头</button>
+                        <button class="btn btn-secondary" onclick="capturePhoto('rec')" disabled id="rec-capture-btn">📸 拍照</button>
+                        <input type="file" accept="image/*" id="rec-file-input" style="display:none" onchange="handleFileUpload(event,'rec')">
+                        <button class="btn btn-outline" onclick="document.getElementById('rec-file-input').click()">🖼️ 选择图片</button>
+                        <button class="btn btn-secondary" onclick="resetCamera('rec')">🔄 重置</button>
+                    </div>
+                </div>
+                <div class="camera-box" style="display:flex;flex-direction:column;">
+                    <button class="btn btn-primary" onclick="doRecognize()" id="rec-submit-btn" disabled style="margin-bottom:12px;padding:14px;font-size:16px;">🔍 开始识别</button>
+                    <div id="rec-msg" class="msg"></div>
+                    <div id="rec-result"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ========== 状态 ==========
+const state = {
+    reg: { stream: null, captured: null },
+    rec: { stream: null, captured: null },
+    gallery: [],
+};
+
+// ========== Tab 切换 ==========
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector(`.tab-btn[onclick*="${name}"]`).classList.add('active');
+    document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ========== 摄像头 ==========
+async function toggleCamera(prefix) {
+    try {
+        const s = state[prefix];
+        if (s.stream) {
+            s.stream.getTracks().forEach(t => t.stop());
+            s.stream = null;
+            document.getElementById(`${prefix}-video`).classList.remove('show');
+            document.getElementById(`${prefix}-placeholder`).style.display = 'flex';
+            document.getElementById(`${prefix}-capture-btn`).disabled = true;
+            document.getElementById(`${prefix}-submit-btn`).disabled = true;
+            return;
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
+        s.stream = stream;
+        const video = document.getElementById(`${prefix}-video`);
+        video.srcObject = stream;
+        video.classList.add('show');
+        document.getElementById(`${prefix}-placeholder`).style.display = 'none';
+        document.getElementById(`${prefix}-capture-btn`).disabled = false;
+    } catch (e) {
+        showMsg(prefix, '无法开启摄像头: ' + e.message, 'error');
+    }
+}
+
+function capturePhoto(prefix) {
+    const s = state[prefix];
+    const video = document.getElementById(`${prefix}-video`);
+    const canvas = document.getElementById(`${prefix}-canvas`);
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    canvas.classList.add('show');
+    s.captured = canvas;
+    document.getElementById(`${prefix}-submit-btn`).disabled = false;
+}
+
+function handleFileUpload(event, prefix) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const s = state[prefix];
+    const img = new Image();
+    img.onload = () => {
+        const canvas = document.getElementById(`${prefix}-canvas`);
+        canvas.width = img.width;
+        canvas.height = img.height;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        canvas.classList.add('show');
+        document.getElementById(`${prefix}-video`).classList.remove('show');
+        document.getElementById(`${prefix}-placeholder`).style.display = 'none';
+        if (s.stream) {
+            s.stream.getTracks().forEach(t => t.stop());
+            s.stream = null;
+        }
+        s.captured = canvas;
+        document.getElementById(`${prefix}-submit-btn`).disabled = false;
+    };
+    img.src = URL.createObjectURL(file);
+    event.target.value = '';
+}
+
+function resetCamera(prefix) {
+    const s = state[prefix];
+    if (s.stream) {
+        s.stream.getTracks().forEach(t => t.stop());
+        s.stream = null;
+    }
+    const video = document.getElementById(`${prefix}-video`);
+    const canvas = document.getElementById(`${prefix}-canvas`);
+    video.classList.remove('show');
+    canvas.classList.remove('show');
+    s.captured = null;
+    document.getElementById(`${prefix}-placeholder`).style.display = 'flex';
+    document.getElementById(`${prefix}-capture-btn`).disabled = true;
+    document.getElementById(`${prefix}-submit-btn`).disabled = true;
+    document.getElementById(`${prefix}-msg`).classList.remove('show');
+    if (prefix === 'rec') {
+        document.getElementById('rec-result').innerHTML = '';
+    }
+}
+
+function canvasToBlob(canvas) {
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+}
+
+// 多帧抓拍（从 video 连拍 N 帧，帧间间隔较大以获取不同角度）
+async function captureFrames(video, canvas, n=5, delayMs=80) {
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    const blobs = [];
+    // 注册时用更长的间隔（600ms），让用户自然微动
+    const actualDelay = (n >= 5) ? 600 : delayMs;
+    for (let i = 0; i < n; i++) {
+        ctx.drawImage(video, 0, 0);
+        const blob = await canvasToBlob(canvas);
+        blobs.push(blob);
+        if (i < n - 1) await new Promise(r => setTimeout(r, actualDelay));
+    }
+    return blobs;
+}
+
+// ========== API ==========
+async function api(path, formData) {
+    const res = await fetch(path, { method: 'POST', body: formData });
+    return res.json();
+}
+
+// ========== 注册（多帧平均）==========
+async function doRegister() {
+    const name = document.getElementById('reg-name').value.trim();
+    if (!name) { showMsg('reg', '请输入姓名', 'error'); return; }
+
+    const s = state.reg;
+    const video = document.getElementById('reg-video');
+    const canvas = document.getElementById('reg-canvas');
+    const btn = document.getElementById('reg-submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 拍摄多帧...';
+
+    const fd = new FormData();
+    fd.append('name', name);
+
+    try {
+        if (s.stream && video.classList.contains('show')) {
+            // 摄像头模式：连拍 6 帧（3 秒内，请自然转动脸部）
+            showMsg('reg', '请慢慢左右转动脸部，正在多角度拍摄...', 'success');
+            const blobs = await captureFrames(video, canvas, 6, 80);
+            blobs.forEach((blob, i) => fd.append(`image${i}`, blob, `face${i}.jpg`));
+        } else if (s.captured) {
+            // 单张模式（选择图片）
+            const blob = await canvasToBlob(s.captured);
+            fd.append('image0', blob, 'face.jpg');
+        } else {
+            showMsg('reg', '请先拍照或上传图片', 'error');
+            btn.disabled = false;
+            btn.textContent = '✅ 录入人脸';
+            return;
+        }
+
+        btn.textContent = '⏳ 分析中...';
+        const data = await api('/api/register', fd);
+        showMsg('reg', data.message, data.success ? 'success' : 'error');
+        if (data.success) {
+            document.getElementById('reg-name').value = '';
+            resetCamera('reg');
+            loadGallery();
+        }
+    } catch (e) {
+        showMsg('reg', '请求失败: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = '✅ 录入人脸';
+}
+
+// ========== 识别（多帧平均）==========
+async function doRecognize() {
+    const s = state.rec;
+    const video = document.getElementById('rec-video');
+    const canvas = document.getElementById('rec-canvas');
+    const btn = document.getElementById('rec-submit-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 拍摄多帧...';
+    document.getElementById('rec-result').innerHTML = '';
+
+    const fd = new FormData();
+
+    try {
+        if (s.stream && video.classList.contains('show')) {
+            // 摄像头模式：连拍 5 帧
+            const blobs = await captureFrames(video, canvas, 5, 80);
+            blobs.forEach((blob, i) => fd.append(`image${i}`, blob, `face${i}.jpg`));
+        } else if (s.captured) {
+            // 单张模式（选择图片）
+            const blob = await canvasToBlob(s.captured);
+            fd.append('image0', blob, 'face.jpg');
+        } else {
+            showMsg('rec', '请先拍照或上传图片', 'error');
+            btn.disabled = false;
+            btn.textContent = '🔍 开始识别';
+            return;
+        }
+
+        btn.textContent = '⏳ 分析中...';
+        const data = await api('/api/recognize', fd);
+        showMsg('rec', data.message || '', data.success ? 'success' : 'error');
+
+        if (data.success) {
+            let html = '';
+            const top = data.results[0];
+
+            if (data.identified) {
+                html += `<div class="result-card identified">
+                    <div class="status-icon">✅</div>
+                    <div class="name">${top.name}</div>
+                    <div class="score">相似度: ${(top.similarity * 100).toFixed(2)}% (阈值: ${(data.threshold * 100).toFixed(1)}%)</div>
+                </div>`;
+            } else {
+                html += `<div class="result-card unidentified">
+                    <div class="status-icon">❌</div>
+                    <div class="name">未识别</div>
+                    <div class="score">最高相似度: ${top ? (top.similarity * 100).toFixed(2) + '%' : '无'} (阈值: ${(data.threshold * 100).toFixed(1)}%)</div>
+                </div>`;
+            }
+
+            if (data.results.length > 0) {
+                html += '<div class="results-list"><h3 style="font-size:14px;margin:12px 0 8px;color:#666;">Top-' + data.results.length + ' 匹配</h3>';
+                data.results.forEach((r, i) => {
+                    const cls = r.similarity >= data.threshold ? 'high' : 'low';
+                    html += `<div class="result-item">
+                        <div class="rank">${i + 1}</div>
+                        <div class="rname">${r.name}</div>
+                        <div class="rsim ${cls}">${(r.similarity * 100).toFixed(2)}%</div>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            document.getElementById('rec-result').innerHTML = html;
+        }
+    } catch (e) {
+        showMsg('rec', '请求失败: ' + e.message, 'error');
+    }
+    btn.disabled = false;
+    btn.textContent = '🔍 开始识别';
+}
+
+// ========== 消息 ==========
+function showMsg(prefix, text, type) {
+    const el = document.getElementById(`${prefix}-msg`);
+    el.textContent = text;
+    el.className = `msg show ${type}`;
+}
+
+// ========== 人脸库 ==========
+async function loadGallery() {
+    try {
+        const res = await fetch('/api/gallery');
+        const data = await res.json();
+        state.gallery = data.items || [];
+        renderGallery();
+    } catch (e) {
+        console.error('加载人脸库失败:', e);
+    }
+}
+
+function renderGallery() {
+    const el = document.getElementById('gallery-list');
+    const countEl = document.getElementById('gallery-count');
+    const items = state.gallery;
+    countEl.textContent = items ? items.length : 0;
+    if (!items || items.length === 0) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><div>暂无录入，请先注册人脸</div></div>';
+        return;
+    }
+    el.innerHTML = '<div class="gallery-grid">' +
+        items.map(item => `<div class="gallery-item">
+            <img src="/gallery/${item.image}" alt="${item.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23f0f0f0%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23ccc%22 font-size=%2230%22>?</text></svg>'">
+            <div class="gname">${item.name}</div>
+            <button class="del-btn" onclick="deletePerson('${item.name}')" title="删除">×</button>
+        </div>`).join('') +
+    '</div>';
+}
+
+async function deletePerson(name) {
+    if (!confirm(`确定删除 "${name}" 吗？`)) return;
+    try {
+        await fetch(`/api/gallery/${encodeURIComponent(name)}`, { method: 'DELETE' });
+        loadGallery();
+    } catch (e) {
+        console.error('删除失败:', e);
+    }
+}
+
+// ========== 初始化 ==========
+loadGallery();
+</script>
+
+</body>
+</html>

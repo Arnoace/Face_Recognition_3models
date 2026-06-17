@@ -85,12 +85,25 @@ class FaceDataset(Dataset):
 
 
 def get_train_transforms():
-    """训练数据增强 (GoogLeNet 需要 224x224)"""
+    """训练数据增强 — 强制模型学会对齐不变性"""
     return transforms.Compose([
-        transforms.Resize((224, 224)),
+        transforms.Resize((256, 256)),  # 先放大，让裁剪有空间
+        transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0)),  # 模拟不同裁切方式
         transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(degrees=20, fill=0),                # 模拟头部倾斜
+        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.2, hue=0.1),
+        # 仿射变换：模拟对齐/不对齐之间的位置差异
+        transforms.RandomAffine(
+            degrees=10,
+            translate=(0.15, 0.15),   # 更大平移，模拟不同裁切中心
+            scale=(0.85, 1.15),        # 缩放抖动，模拟不同外扩比例
+            shear=5,                    # 剪切，模拟透视角度变化
+            fill=0
+        ),
         transforms.ToTensor(),
+        transforms.RandomApply([transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0))], p=0.3),
         transforms.Normalize(mean=[0.5], std=[0.5]),
+        transforms.RandomErasing(p=0.4, scale=(0.02, 0.15), ratio=(0.3, 3.3)),
     ])
 
 

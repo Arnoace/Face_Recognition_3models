@@ -166,10 +166,30 @@
     <div>
       <div class="card glass">
         <div class=card-title>人脸识别</div>
-        <video id=att-video autoplay playsinline style="width:100%;border-radius:10px;background:#000;border:1px solid rgba(59,130,246,.1);aspect-ratio:4/3;object-fit:cover"></video>
-        <div class=camera-controls style=margin-top:12px>
-          <button class="btn btn-primary" onclick="capture('att-video','att-preview','att-nophoto','att')">拍照</button>
-          <button class="btn btn-success" id=btn-recog onclick=recognize() disabled>识别 & 签到</button>
+        <div class="input-mode-tabs" style=margin-bottom:10px>
+          <button class="input-mode-tab active" data-mode="live" onclick="switchAttMode('live')">摄像头识别</button>
+          <button class="input-mode-tab" data-mode="upload" onclick="switchAttMode('upload')">图片上传</button>
+        </div>
+        <div id=att-panel-live class="entry-mode-panel active">
+          <video id=att-video autoplay playsinline style="width:100%;border-radius:10px;background:#000;border:1px solid rgba(59,130,246,.1);aspect-ratio:4/3;object-fit:cover"></video>
+          <div class=camera-controls style=margin-top:12px>
+            <button class="btn btn-primary" onclick="capture('att-video','att-preview','att-nophoto','att')">拍照</button>
+            <button class="btn btn-success" id=btn-recog onclick=recognize() disabled>识别 & 签到</button>
+          </div>
+        </div>
+        <div id=att-panel-upload class="entry-mode-panel">
+          <div class="upload-camera-wrapper">
+            <div class="upload-placeholder" id=att-upload-placeholder>
+              <div class=upload-illustration>🖼️</div>
+              <h3>上传人脸照片</h3>
+              <p>选择一张包含人脸的正面照片</p>
+              <button type="button" class="upload-btn" onclick="document.getElementById('att-file-input').click()">选择照片</button>
+              <input id=att-file-input type=file accept="image/jpeg,image/png" hidden onchange="handleAttUpload(event)">
+            </div>
+          </div>
+          <div class=camera-controls style=margin-top:12px>
+            <button class="btn btn-success" id=btn-recog-upload onclick="recognizeUpload()" disabled>识别 & 签到</button>
+          </div>
         </div>
         <div id=att-result class=recognition-result></div>
         <img id=att-preview style="display:none;width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid rgba(59,130,246,.2);margin-top:8px">
@@ -352,6 +372,84 @@ function recognize(){
 function loadTodayAtt(){fetch('/api/attendance').then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];const tb=document.getElementById('tbody-att'),tbl=document.getElementById('tbl-att'),em=document.getElementById('empty-att');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td><strong>'+esc(r.name)+'</strong></td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td>'})}).catch(e=>console.error(e))}
 function loadRecords(){const s=document.getElementById('filter-start').value;const e=document.getElementById('filter-end').value;let u='/api/attendance/all?limit=1000';if(s)u+='&start='+s;if(e)u+='&end='+e;fetch(u).then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];document.getElementById('record-count').textContent='共 '+records.length+' 条记录';const tb=document.getElementById('tbody-records'),tbl=document.getElementById('tbl-records'),em=document.getElementById('empty-records');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td>'+r.id+'</td><td><strong>'+esc(r.name)+'</strong></td><td>'+esc(r.employee_id)+'</td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td>'})}).catch(e=>console.error(e))}
 function clearFilter(){document.getElementById('filter-start').value='';document.getElementById('filter-end').value='';loadRecords()}
+
+// =========== Attendance mode switch (live / upload) ===========
+let S_attUploadFile = null;
+
+function switchAttMode(mode) {
+  document.querySelectorAll('#page-attendance .input-mode-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  document.querySelectorAll('#page-attendance .entry-mode-panel').forEach(p => p.classList.toggle('active', p.id === 'att-panel-' + mode));
+  if (mode === 'live') {
+    clearAttUpload();
+    setTimeout(() => startCam('att-video'), 100);
+    document.getElementById('att-preview').style.display = 'none';
+    document.getElementById('att-nophoto').style.display = 'inline';
+  } else {
+    stopCamera();
+  }
+}
+
+function resetAttFileInput() {
+  const old = document.getElementById('att-file-input');
+  const clone = old.cloneNode(true);
+  clone.removeAttribute('value');
+  old.parentNode.replaceChild(clone, old);
+  clone.addEventListener('change', handleAttUpload);
+}
+
+function handleAttUpload(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  S_attUploadFile = f;
+  const r = new FileReader();
+  r.onload = function(ev) {
+    const u = ev.target.result;
+    document.getElementById('att-preview').src = u;
+    document.getElementById('att-preview').style.display = 'block';
+    document.getElementById('att-nophoto').style.display = 'none';
+    document.getElementById('btn-recog-upload').disabled = false;
+    // 不修改占位区，"选择照片"按钮始终可见可点，和"拍照"一样
+  };
+  r.readAsDataURL(f);
+  resetAttFileInput();
+}
+
+function clearAttUpload() {
+  S_attUploadFile = null;
+  document.getElementById('btn-recog-upload').disabled = true;
+  document.getElementById('att-preview').style.display = 'none';
+  document.getElementById('att-nophoto').style.display = 'inline';
+  resetAttFileInput();
+}
+
+function recognizeUpload() {
+  if (!S_attUploadFile) return showToast('请先选择照片', 'error');
+  const btn = document.getElementById('btn-recog-upload'); btn.disabled = true; btn.innerHTML = '<span class=spinner></span> 识别中...';
+  const fd = new FormData(); fd.append('file', S_attUploadFile);
+  document.getElementById('att-result').className = 'recognition-result'; document.getElementById('att-result').innerHTML = '';
+  fetch('/api/recognize', {method:'POST', body:fd}).then(r=>r.json()).then(d => {
+    const r = document.getElementById('att-result');
+    if (d.code===200 && d.data?.found) {
+      const emp = d.data.employee;
+      r.className = 'recognition-result show success';
+      r.innerHTML = '<div class=name>'+esc(emp.name)+'</div><div class=detail>'+(emp.department||'-')+' | '+emp.employee_id+'</div><div class=detail>相似度: '+(d.data.similarity*100).toFixed(1)+'%</div>';
+      showToast('识别成功: '+emp.name, 'success');
+      fetch('/api/attendance/checkin?employee_id='+emp.employee_id+'&name='+encodeURIComponent(emp.name), {method:'POST'}).then(r=>r.json()).then(cd => {
+        if(cd.data?.duplicate) showToast('今日已签到', 'info');
+        else showToast('签到成功 ('+(cd.data?.status||'正常')+')', 'success');
+        loadTodayAtt(); loadRecords();
+      }).catch(()=>{});
+    } else {
+      const msg = d.data?.message || '未匹配到人脸';
+      r.className = 'recognition-result show fail';
+      r.innerHTML = '<div class=name>未识别</div><div class=detail>'+msg+'</div>'+(d.data?.similarity!==undefined?'<div class=detail>最佳匹配: '+(d.data.similarity*100).toFixed(1)+'%</div>':'');
+      showToast('未识别: '+msg, 'error');
+    }
+  }).catch(e => showToast('请求失败: '+e.message, 'error')).finally(() => {
+    btn.disabled=false; btn.textContent='识别 & 签到';
+    // 保留已上传图片，切换模型后可以直接再次识别
+  });
+}
 // =========== Employee Detail ===========
 function openDetail(pk){
   const overlay=document.getElementById('detail-panel');

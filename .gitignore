@@ -26,3 +26,6 @@ Thumbs.db
 # Environment
 .env
 *.env.local
+
+# Pre-trained model weights (some exceed GitHub 100MB limit)
+models/model_b/models/

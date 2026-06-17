@@ -4,6 +4,8 @@
 """
 
 import os
+import shutil
+import tempfile
 import numpy as np
 import cv2
 from models import BaseFaceModel
@@ -11,6 +13,26 @@ from models import BaseFaceModel
 _BASE = os.path.dirname(os.path.abspath(__file__))
 _MODEL_DIR = os.path.join(_BASE, 'models')
 _MODEL_PATH = os.path.join(_MODEL_DIR, 'fisherfaces_model.yml')
+
+
+def _ascii_path(path: str) -> str:
+    """将含中文的路径复制到纯 ASCII 临时路径，
+    解决 OpenCV C++ 底层在 Windows 上不支持 UTF-8 路径的问题。"""
+    if not os.path.exists(path):
+        return path
+    try:
+        path.encode('ascii')
+        return path
+    except UnicodeEncodeError:
+        pass
+    # 用 SYSTEMROOT (C:\Windows) 下的临时目录，保证纯 ASCII
+    sysroot = os.environ.get('SYSTEMROOT', 'C:\\Windows')
+    tmp_dir = os.path.join(sysroot, 'Temp')
+    os.makedirs(tmp_dir, exist_ok=True)
+    ext = os.path.splitext(path)[1]
+    dst = os.path.join(tmp_dir, f'_{os.urandom(4).hex()}{ext}')
+    shutil.copy2(path, dst)
+    return dst
 
 
 class FisherfacesModel(BaseFaceModel):
@@ -28,7 +50,7 @@ class FisherfacesModel(BaseFaceModel):
             return
         try:
             model = cv2.face.FisherFaceRecognizer_create()
-            model.read(_MODEL_PATH)
+            model.read(_ascii_path(_MODEL_PATH))  # 使用短路径解决中文路径问题
             self._eigenvectors = model.getEigenVectors()      # (2500, 27)
             self._mean_face = model.getMean().flatten()        # (2500,)
             self._loaded = True

@@ -1,7 +1,13 @@
 # 人脸考勤系统
-
 基于 **FaceNet**（Google CVPR 2015）的人脸识别考勤系统，内含两个模型。
-
+当前 ModelB = FaceNet，具体是 facenet_pretrained 模式：
+骨干网络: InceptionResNetV1（VGGFace2 预训练，331万张人脸）
+输入: 160×160 RGB，InsightFace 五点对齐
+特征维度: 512
+模型文件: models/model_b/models/facenet_pytorch_vggface2.pt
+这是默认配置（backend/app.py:51），因为 FaceNetModel() 没有传参数，走的就是 model_type="facenet_pretrained"。
+如果想切换成本地训练的版本，把 backend/app.py:51 改成：
+m_modelb = FaceNetModel(model_type="facenet_v6")
 ## 目录结构
 
 ```
@@ -30,13 +36,13 @@ attendance_system/
 | 项目 | facenet_v6（本地训练） | facenet_pretrained（预训练） |
 |------|:---:|:---:|
 | 骨干网络 | **GoogLeNet** (Inception v1) | **InceptionResNetV1** (NN3) |
-| 训练数据 | YaleB + ORL + 自拍 (68人) | **VGGFace2** (9131人, 331万张) |
-| 预处理 | CLAHE+Gamma 灰度图 | 五点对齐 RGB |
-| 输入尺寸 | 112×112 灰度 | 160×160 RGB |
-| 是否需要训练 | ✅ 已训练完成 | ✅ 预训练完成，无需训练 |
-| 熟人相似度 | 60-85% | **90-98%** |
-| 陌生人拒识 | 需精细调阈值 | 天然低分，好调 |
-| 切换方式 | `MODEL_TYPE = "facenet_v6"` | `MODEL_TYPE = "facenet_pretrained"` [默认] |
+| 训练数据 | YaleB + ORL + 自拍 (68人)     | **VGGFace2** (9131人, 331万张) |
+| 预处理 | CLAHE+Gamma 灰度图              | 五点对齐 RGB |
+| 输入尺寸 | 112×112 灰度                  | 160×160 RGB |
+| 是否需要训练 | ✅ 已训练完成              | ✅ 预训练完成，无需训练 |
+| 熟人相似度 | 60-85%                      | **90-98%** |
+| 陌生人拒识 | 需精细调阈值                 | 天然低分，好调 |
+| 切换方式 | `MODEL_TYPE = "facenet_v6"`  | `MODEL_TYPE = "facenet_pretrained"` [默认] |
 
 ## 快速使用（Web 界面）
 

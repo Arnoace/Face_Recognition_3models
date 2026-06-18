@@ -27,5 +27,5 @@ Thumbs.db
 .env
 *.env.local
 
-# Pre-trained model weights (some exceed GitHub 100MB limit)
-models/model_b/models/
+# Pre-trained model weights exceeding GitHub's 100MB limit
+models/model_b/models/facenet_pytorch_vggface2.pt

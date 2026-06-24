@@ -46,17 +46,25 @@ class FisherfacesModel(BaseFaceModel):
     def _load_model(self):
         """加载预训练的 Fisherfaces 模型，提取投影矩阵"""
         if not os.path.exists(_MODEL_PATH):
-            print(f"[Fisherfaces] 未找到预训练模型 {_MODEL_PATH}，回退到原始像素特征")
+            print(f"[Fisherfaces] 未找到预训练模型 {_MODEL_PATH}")
+            print("[Fisherfaces] 请确保 fisherfaces_model.yml 存在于 models/model_a/models/ 目录")
             return
+        # 多层回退策略：先尝试原始路径，再尝试 ASCII 短路径
+        load_path = _MODEL_PATH
         try:
             model = cv2.face.FisherFaceRecognizer_create()
-            model.read(_ascii_path(_MODEL_PATH))  # 使用短路径解决中文路径问题
+            try:
+                model.read(_MODEL_PATH)
+            except Exception:
+                load_path = _ascii_path(_MODEL_PATH)
+                model.read(load_path)
             self._eigenvectors = model.getEigenVectors()      # (2500, 27)
             self._mean_face = model.getMean().flatten()        # (2500,)
             self._loaded = True
-            print(f"[Fisherfaces] 预训练模型已加载，特征维度: {self._eigenvectors.shape[1]}")
+            print(f"[Fisherfaces] 预训练模型已加载 ({load_path})，特征维度: {self._eigenvectors.shape[1]}")
         except Exception as e:
-            print(f"[Fisherfaces] 加载模型失败: {e}，回退到原始像素特征")
+            print(f"[Fisherfaces] 模型加载失败: {e}")
+            print("[Fisherfaces] 陌生人拒识将不可靠，请检查模型文件路径是否含中文或权限问题")
 
     def _preprocess(self, img):
         """预处理：灰度化 → 缩放 50×50 → 直方图均衡化 → 展平"""
@@ -71,7 +79,7 @@ class FisherfacesModel(BaseFaceModel):
     def extract_feature(self, img):
         """提取 Fisherfaces 判别性特征"""
         if not self._loaded:
-            # 回退：原始像素特征 (100×100 = 10000维)
+            # 回退：原始像素特征 (100×100 = 10000维) —— 准确性差，仅应急
             g = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
             g = cv2.resize(g, (100, 100))
             f = g.flatten().astype(np.float32)
@@ -95,5 +103,15 @@ class FisherfacesModel(BaseFaceModel):
         return 27 if self._loaded else 10000
 
     @property
+    def recommended_threshold(self):
+        """根据加载状态返回推荐阈值"""
+        return 0.55 if self._loaded else 0.95
+
+    @property
+    def recommended_margin(self):
+        """根据加载状态返回推荐竞争裕度"""
+        return 0.15 if self._loaded else 0.05
+
+    @property
     def is_loaded(self):
-        return True
+        return self._loaded

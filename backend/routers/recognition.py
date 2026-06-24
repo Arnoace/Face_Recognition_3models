@@ -178,10 +178,15 @@ class FeatureDatabase:
         self.features = np.delete(self.features, idxs[0], axis=0)
         s["db_metadata"] = [m for m in s["db_metadata"] if m['id']!=pk]
 
-    def find_match(self, qf, th=None, model_name=None):
+    def find_match(self, qf, th=None, model_name=None, model=None):
         if th is None:
             th = config.get_similarity_threshold(model_name) if model_name else config.SIMILARITY_THRESHOLD
+        # 模型可能推荐更合适的阈值（如 Fisherfaces 回退模式需更高阈值）
+        if model and hasattr(model, 'recommended_threshold'):
+            th = max(th, model.recommended_threshold)
         margin = config.get_similarity_margin(model_name) if model_name else 0.10
+        if model and hasattr(model, 'recommended_margin'):
+            margin = max(margin, model.recommended_margin)
         s = self._store(model_name)
         if s["features"].size == 0:
             return {'found':False,'similarity':0,'employee':None,'threshold':round(th,4)}
@@ -228,5 +233,6 @@ def create_recognition_router(model_manager, feature_db):
         except Exception as e:
             return {"code": 400, "data": {"found": False, "message": f"特征提取失败: {str(e)}"}}
         model_name = model_manager.current_name
-        return {"code": 200, "data": feature_db.find_match(feat, model_name=model_name)}
+        current_model = model_manager.current
+        return {"code": 200, "data": feature_db.find_match(feat, model_name=model_name, model=current_model)}
     return router

@@ -12,7 +12,7 @@ from backend.routers.recognition import create_recognition_router, FeatureDataba
 from backend.routers.attendance import create_attendance_router
 from backend.routers.model import create_model_router
 from models.model_manager import ModelManager
-from models.arcface import ArcFaceModel
+from models.arcface import ArcFaceModel, ArcFaceSelfTrainedModel
 from models.model_a import FisherfacesModel
 from models.model_b import FaceNetModel
 
@@ -53,6 +53,13 @@ try:
     logger.info(f"FaceNet registered: {m_modelb.name}")
 except Exception as e:
     logger.error(f"Model-B load failed: {e}")
+
+try:
+    m_arcface_selftrained = ArcFaceSelfTrainedModel()
+    model_manager.register("ArcFaceSelfTrained", m_arcface_selftrained)
+    logger.info(f"ArcFaceSelfTrained registered: {m_arcface_selftrained.name}")
+except Exception as e:
+    logger.error(f"ArcFaceSelfTrained load failed: {e}")
 
 logger.info("Building feature database...")
 feature_db = FeatureDatabase(db, model_manager)

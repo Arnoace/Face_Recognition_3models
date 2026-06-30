@@ -200,7 +200,7 @@
       <div class="card glass">
         <div class=card-title>今日签到</div>
         <div class=table-wrapper style=max-height:500px;overflow-y:auto>
-          <table id=tbl-att style=display:none><thead><tr><th>姓名</th><th>签到时间</th><th>状态</th></tr></thead><tbody id=tbody-att></tbody></table>
+          <table id=tbl-att style=display:none><thead><tr><th>姓名</th><th>签到时间</th><th>状态</th><th>打卡照片</th></tr></thead><tbody id=tbody-att></tbody></table>
           <div id=empty-att class=empty-state><p>今日暂无签到</p></div>
         </div>
       </div>
@@ -221,7 +221,7 @@
       <span id=record-count style=font-size:13px;color:#64748B;margin-left:8px></span>
     </div>
     <div class=table-wrapper style=max-height:600px;overflow-y:auto>
-      <table id=tbl-records style=display:none><thead><tr><th>编号</th><th>姓名</th><th>工号</th><th>签到时间</th><th>状态</th></tr></thead><tbody id=tbody-records></tbody></table>
+      <table id=tbl-records style=display:none><thead><tr><th>编号</th><th>姓名</th><th>工号</th><th>签到时间</th><th>状态</th><th>打卡照片</th></tr></thead><tbody id=tbody-records></tbody></table>
       <div id=empty-records class=empty-state><p>暂无记录</p></div>
     </div>
   </div>
@@ -245,6 +245,11 @@
       <div id=detail-features class=detail-features></div>
     </div>
   </div>
+</div>
+
+<!-- =========== 打卡照片弹窗 =========== -->
+<div id=photo-panel class=detail-overlay style=display:none onclick="if(event.target===this)closePhoto()">
+  <div class=detail-content onclick="event.stopPropagation()"></div>
 </div>
 
 <script>
@@ -356,7 +361,8 @@ function recognize(){
       r.className='recognition-result show success';
       r.innerHTML='<div class=name>'+esc(emp.name)+'</div><div class=detail>'+(emp.department||'-')+' | '+emp.employee_id+'</div><div class=detail>相似度: '+(d.data.similarity*100).toFixed(1)+'%</div>';
       showToast('识别成功: '+emp.name,'success');
-      fetch('/api/attendance/checkin?employee_id='+emp.employee_id+'&name='+encodeURIComponent(emp.name),{method:'POST'}).then(r=>r.json()).then(cd=>{
+      const cfd=new FormData();cfd.append('employee_id',emp.employee_id);cfd.append('name',emp.name);cfd.append('file',dataURLtoBlob(S.captured.att),'face.jpg');
+      fetch('/api/attendance/checkin',{method:'POST',body:cfd}).then(r=>r.json()).then(cd=>{
         if(cd.data?.duplicate)showToast('今日已签到','info');
         else showToast('签到成功 ('+(cd.data?.status||'正常')+')','success');
         loadTodayAtt();loadRecords();
@@ -369,8 +375,8 @@ function recognize(){
     }
   }).catch(e=>showToast('请求失败: '+e.message,'error')).finally(()=>{btn.disabled=false;btn.textContent='识别 & 签到'})
 }
-function loadTodayAtt(){fetch('/api/attendance').then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];const tb=document.getElementById('tbody-att'),tbl=document.getElementById('tbl-att'),em=document.getElementById('empty-att');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td><strong>'+esc(r.name)+'</strong></td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td>'})}).catch(e=>console.error(e))}
-function loadRecords(){const s=document.getElementById('filter-start').value;const e=document.getElementById('filter-end').value;let u='/api/attendance/all?limit=1000';if(s)u+='&start='+s;if(e)u+='&end='+e;fetch(u).then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];document.getElementById('record-count').textContent='共 '+records.length+' 条记录';const tb=document.getElementById('tbody-records'),tbl=document.getElementById('tbl-records'),em=document.getElementById('empty-records');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td>'+r.id+'</td><td><strong>'+esc(r.name)+'</strong></td><td>'+esc(r.employee_id)+'</td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td>'})}).catch(e=>console.error(e))}
+function loadTodayAtt(){fetch('/api/attendance').then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];const tb=document.getElementById('tbody-att'),tbl=document.getElementById('tbl-att'),em=document.getElementById('empty-att');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td><strong>'+esc(r.name)+'</strong></td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td><td>'+(r.has_photo?'<button class="btn btn-sm btn-outline" onclick="viewAttPhoto('+r.id+')">📷</button>':'—')+'</td>'})}).catch(e=>console.error(e))}
+function loadRecords(){const s=document.getElementById('filter-start').value;const e=document.getElementById('filter-end').value;let u='/api/attendance/all?limit=1000';if(s)u+='&start='+s;if(e)u+='&end='+e;fetch(u).then(r=>r.json()).then(d=>{if(d.code!==200)return;const records=d.data||[];document.getElementById('record-count').textContent='共 '+records.length+' 条记录';const tb=document.getElementById('tbody-records'),tbl=document.getElementById('tbl-records'),em=document.getElementById('empty-records');tb.innerHTML='';if(!records.length){tbl.style.display='none';em.style.display='block';return}tbl.style.display='';em.style.display='none';records.forEach(r=>{tb.innerHTML+='<tr><td>'+r.id+'</td><td><strong>'+esc(r.name)+'</strong></td><td>'+esc(r.employee_id)+'</td><td class=timestamp>'+fmt(r.check_in)+'</td><td><span class="badge '+(r.status==='迟到'?'badge-warning':'badge-success')+'">'+(r.status||'正常')+'</span></td><td>'+(r.has_photo?'<button class="btn btn-sm btn-outline" onclick="viewAttPhoto('+r.id+')">📷</button>':'—')+'</td>'})}).catch(e=>console.error(e))}
 function clearFilter(){document.getElementById('filter-start').value='';document.getElementById('filter-end').value='';loadRecords()}
 
 // =========== Attendance mode switch (live / upload) ===========
@@ -434,7 +440,8 @@ function recognizeUpload() {
       r.className = 'recognition-result show success';
       r.innerHTML = '<div class=name>'+esc(emp.name)+'</div><div class=detail>'+(emp.department||'-')+' | '+emp.employee_id+'</div><div class=detail>相似度: '+(d.data.similarity*100).toFixed(1)+'%</div>';
       showToast('识别成功: '+emp.name, 'success');
-      fetch('/api/attendance/checkin?employee_id='+emp.employee_id+'&name='+encodeURIComponent(emp.name), {method:'POST'}).then(r=>r.json()).then(cd => {
+      const cfd=new FormData();cfd.append('employee_id',emp.employee_id);cfd.append('name',emp.name);cfd.append('file',S_attUploadFile);
+      fetch('/api/attendance/checkin', {method:'POST',body:cfd}).then(r=>r.json()).then(cd => {
         if(cd.data?.duplicate) showToast('今日已签到', 'info');
         else showToast('签到成功 ('+(cd.data?.status||'正常')+')', 'success');
         loadTodayAtt(); loadRecords();
@@ -459,9 +466,9 @@ function openDetail(pk){
     if(d.code!==200){overlay.style.display='none';return}
     const e=d.data;
     const avai=e.available_models||[];
-    const mlabels={'ArcFace':'ArcFace模型','ModelA':'Fisherfaces','ModelB':'FaceNet'};
+    const mlabels={'ArcFace':'ArcFace模型','ArcFaceSelfTrained':'ArcFace(Self-Trained)','ModelA':'Fisherfaces','ModelB':'FaceNet'};
     let featHtml='';
-    ['ArcFace','ModelA','ModelB'].forEach(function(mn){
+    ['ArcFace','ArcFaceSelfTrained','ModelA','ModelB'].forEach(function(mn){
       const info=e.features&&e.features[mn];
       if(info){var fs='['+info.preview.join(', ')+']';featHtml+='<div class=detail-feature-item><span class=\"icon ok\">✓</span><div style=flex:1><div class=name>'+info.label+'</div><div style=font-size:11px;color:#64748B;margin-top:2px>'+info.dim_label+' | 范数:'+info.norm+'</div><pre class=feature-preview>'+fs+'</pre></div></div>'}
       else{featHtml+='<div class=detail-feature-item><span class=\"icon none\">—</span><div><div class=name>'+(mlabels[mn]||mn)+'</div><div style=font-size:11px;color:#475569>无特征</div></div></div>'}
@@ -479,6 +486,21 @@ function openDetail(pk){
   }).catch(function(){overlay.style.display='none'});
 }
 function closeDetail(){document.getElementById('detail-panel').style.display='none'}
+function viewAttPhoto(id){
+  const overlay=document.getElementById('photo-panel');
+  overlay.style.display='flex';
+  overlay.innerHTML='<div class=detail-content onclick="event.stopPropagation()"><div style="text-align:center;padding:40px"><div class=spinner></div><p style="color:#64748B;margin-top:12px">加载中...</p></div></div>';
+  fetch('/api/attendance/'+id+'/photo').then(r=>r.json()).then(d=>{
+    if(d.code!==200){overlay.style.display='none';showToast('无打卡照片','error');return}
+    const p=d.data;
+    overlay.innerHTML='<div class=detail-content style="max-width:500px;text-align:center" onclick="event.stopPropagation()">'+
+      '<button class="btn btn-sm detail-close" onclick="closePhoto()">✕</button>'+
+      '<h3 style=margin-bottom:16px>打卡人脸照片</h3>'+
+      '<img src="data:'+p.photo_mime+';base64,'+p.photo_base64+'" alt="打卡照片" style="max-width:100%;max-height:70vh;border-radius:12px;border:2px solid rgba(59,130,246,.2)">'+
+      '</div>';
+  }).catch(function(){overlay.style.display='none';showToast('加载失败','error')});
+}
+function closePhoto(){document.getElementById('photo-panel').style.display='none'}
 function dataURLtoBlob(u){const p=u.split(','),m=p[0].match(/:(.*?);/)[1],b=atob(p[1]),a=new Uint8Array(b.length);for(let i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return new Blob([a],{type:m})}
 function fmt(ts){if(!ts)return'';const d=new Date(ts+'Z');return d.toLocaleString('zh-CN',{hour12:false})}
 function esc(s){if(!s)return'';return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -493,7 +515,7 @@ function loadModelStatus(){
     avai.forEach(m=>{
       const o=document.createElement('option');
       o.value=m;
-      o.textContent=m==='ArcFace'?'ArcFace模型':m==='ModelA'?'Fisherfaces':m==='ModelB'?'FaceNet':m;
+      o.textContent=m==='ArcFace'?'ArcFace模型':m==='ArcFaceSelfTrained'?'ArcFace(Self-Trained)':m==='ModelA'?'Fisherfaces':m==='ModelB'?'FaceNet':m;
       if(m===cur)o.selected=true;
       sel.appendChild(o);
     });

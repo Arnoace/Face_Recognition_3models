@@ -98,7 +98,7 @@ class Database:
             nrm = float(np.linalg.norm(feat))
             dim = feat.shape[0]
             preview = feat.tolist()
-            label = {'ArcFace': 'ArcFace模型', 'ModelA': 'Fisherfaces', 'ModelB': 'FaceNet'}.get(mn, mn)
+            label = {'ArcFace': 'ArcFace模型', 'ArcFaceSelfTrained': 'ArcFace(Self-Trained)', 'ModelA': 'Fisherfaces', 'ModelB': 'FaceNet'}.get(mn, mn)
             dim_label = f'{dim}维'
             d['features'][mn] = {'dim': dim, 'dim_label': dim_label, 'norm': round(nrm, 4), 'preview': preview, 'label': label}
         del d['face_feature']
@@ -131,9 +131,9 @@ class Database:
         dim = features[0].shape[0] if features else 512
         return np.array(features) if features else np.empty((0, dim)), meta
 
-    def add_attendance(self, employee_id, name, status='正常'):
+    def add_attendance(self, employee_id, name, status='正常', photo_bytes=None):
         conn = self._connect()
-        conn.execute("INSERT INTO attendance (employee_id,name,status) VALUES (?,?,?)", (employee_id, name, status))
+        conn.execute("INSERT INTO attendance (employee_id,name,status,photo) VALUES (?,?,?,?)", (employee_id, name, status, photo_bytes))
         conn.commit()
         row = conn.execute("SELECT * FROM attendance WHERE id=last_insert_rowid()").fetchone()
         conn.close()
@@ -141,7 +141,7 @@ class Database:
 
     def get_attendance(self, limit=500, start=None, end=None):
         conn = self._connect()
-        sql = "SELECT * FROM attendance"
+        sql = "SELECT id,employee_id,name,check_in,status,photo IS NOT NULL AS has_photo FROM attendance"
         params, conds = [], []
         if start:
             conds.append("date(check_in) >= ?")
@@ -159,7 +159,7 @@ class Database:
 
     def get_today_attendance(self):
         conn = self._connect()
-        rows = conn.execute("SELECT * FROM attendance WHERE date(check_in)=date('now') ORDER BY check_in DESC").fetchall()
+        rows = conn.execute("SELECT id,employee_id,name,check_in,status,photo IS NOT NULL AS has_photo FROM attendance WHERE date(check_in)=date('now') ORDER BY check_in DESC").fetchall()
         conn.close()
         return [dict(r) for r in rows]
 
@@ -174,6 +174,26 @@ class Database:
         r = conn.execute("SELECT COUNT(*) as c FROM attendance").fetchone()
         conn.close()
         return r['c']
+
+    def get_attendance_photo(self, pk):
+        """Get the check-in face photo for an attendance record."""
+        conn = self._connect()
+        row = conn.execute("SELECT photo FROM attendance WHERE id=?", (pk,)).fetchone()
+        conn.close()
+        if not row or not row['photo']:
+            return None
+        import base64
+        return {
+            'photo_base64': base64.b64encode(row['photo']).decode('ascii'),
+            'photo_mime': 'image/jpeg',
+        }
+
+    def set_attendance_photo(self, pk, photo_bytes):
+        """Update the photo for an existing attendance record."""
+        conn = self._connect()
+        conn.execute("UPDATE attendance SET photo=? WHERE id=?", (photo_bytes, pk))
+        conn.commit()
+        conn.close()
 
     def get_employee_count(self):
         conn = self._connect()

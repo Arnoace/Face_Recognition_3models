@@ -29,3 +29,4 @@ Thumbs.db
 
 # Pre-trained model weights exceeding GitHub's 100MB limit
 models/model_b/models/facenet_pytorch_vggface2.pt
+models/arcface/arcface_custom_iresnet50.pt

@@ -1,3 +1,3 @@
-from .model import ArcFaceModel
+from .model import ArcFaceModel, ArcFaceSelfTrainedModel
 
-__all__ = ['ArcFaceModel']
+__all__ = ['ArcFaceModel', 'ArcFaceSelfTrainedModel']
